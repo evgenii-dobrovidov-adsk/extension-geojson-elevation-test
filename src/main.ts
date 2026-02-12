@@ -4,6 +4,8 @@ import "./style.css";
 let geojsonId: string | null = null;
 let meshId: string | null = null;
 let outlineId: string | null = null;
+let meshShadowId: string | null = null;
+let outlineShadowId: string | null = null;
 let extrudedId: string | null = null;
 
 async function showFloatingSquare(): Promise<void> {
@@ -202,6 +204,170 @@ async function removeMesh(): Promise<void> {
   updateStatus("Mesh removed");
 }
 
+async function showMeshPolygonWithShadow(): Promise<void> {
+  if (meshShadowId) {
+    await Forma.render.remove({ id: meshShadowId });
+    meshShadowId = null;
+  }
+  if (outlineShadowId) {
+    await Forma.render.remove({ id: outlineShadowId });
+    outlineShadowId = null;
+  }
+
+  // 1. Terrain bounds
+  const bbox = await Forma.terrain.getBbox();
+  const centerX = (bbox.min.x + bbox.max.x) / 2;
+  const centerY = (bbox.min.y + bbox.max.y) / 2;
+  
+  const elevation = await Forma.terrain.getElevationAt({
+    x: centerX,
+    y: centerY,
+  });
+
+  // 2. Define square size (100m × 100m), positioned 175m above terrain
+  const halfSize = 50;
+  const targetZ = (elevation ?? 0) + 175;
+  
+  console.log("Mesh with shadow target Z elevation:", targetZ);
+
+  // 3. Create flat polygon mesh with vertices and triangles (double-sided for shadow)
+  const x1 = centerX - halfSize;
+  const x2 = centerX + halfSize;
+  const y1 = centerY - halfSize;
+  const y2 = centerY + halfSize;
+
+  const position = new Float32Array([
+    // Front side (visible from above)
+    // Triangle 1: bottom-left, bottom-right, top-right
+    x1, y1, targetZ,
+    x2, y1, targetZ,
+    x2, y2, targetZ,
+    // Triangle 2: bottom-left, top-right, top-left
+    x1, y1, targetZ,
+    x2, y2, targetZ,
+    x1, y2, targetZ,
+    
+    // Back side (visible from below) - reversed winding
+    // Triangle 1: bottom-left, top-right, bottom-right
+    x1, y1, targetZ,
+    x2, y2, targetZ,
+    x2, y1, targetZ,
+    // Triangle 2: bottom-left, top-left, top-right
+    x1, y1, targetZ,
+    x1, y2, targetZ,
+    x2, y2, targetZ,
+  ]);
+
+  // Per-vertex colors: RGBA for each of the 12 vertices (red with 60% opacity)
+  const color = new Uint8Array(12 * 4);
+  for (let i = 0; i < 12; i++) {
+    color[i * 4] = 255;     // R
+    color[i * 4 + 1] = 0;   // G
+    color[i * 4 + 2] = 0;   // B
+    color[i * 4 + 3] = 153; // A
+  }
+
+  const result = await Forma.render.addMesh({
+    geometryData: { position, color },
+  });
+
+  meshShadowId = result.id;
+
+  // 4. Create white outline using thin strips (double-sided)
+  const lineWidth = 1.5;
+  const outlineZ = targetZ + 0.1;
+
+  const outlinePosition = new Float32Array([
+    // Bottom edge (y1) - front
+    x1, y1 - lineWidth, outlineZ,
+    x2, y1 - lineWidth, outlineZ,
+    x2, y1 + lineWidth, outlineZ,
+    x1, y1 - lineWidth, outlineZ,
+    x2, y1 + lineWidth, outlineZ,
+    x1, y1 + lineWidth, outlineZ,
+    // Bottom edge (y1) - back
+    x1, y1 - lineWidth, outlineZ,
+    x2, y1 + lineWidth, outlineZ,
+    x2, y1 - lineWidth, outlineZ,
+    x1, y1 - lineWidth, outlineZ,
+    x1, y1 + lineWidth, outlineZ,
+    x2, y1 + lineWidth, outlineZ,
+    
+    // Top edge (y2) - front
+    x1, y2 - lineWidth, outlineZ,
+    x2, y2 - lineWidth, outlineZ,
+    x2, y2 + lineWidth, outlineZ,
+    x1, y2 - lineWidth, outlineZ,
+    x2, y2 + lineWidth, outlineZ,
+    x1, y2 + lineWidth, outlineZ,
+    // Top edge (y2) - back
+    x1, y2 - lineWidth, outlineZ,
+    x2, y2 + lineWidth, outlineZ,
+    x2, y2 - lineWidth, outlineZ,
+    x1, y2 - lineWidth, outlineZ,
+    x1, y2 + lineWidth, outlineZ,
+    x2, y2 + lineWidth, outlineZ,
+    
+    // Left edge (x1) - front
+    x1 - lineWidth, y1, outlineZ,
+    x1 + lineWidth, y1, outlineZ,
+    x1 + lineWidth, y2, outlineZ,
+    x1 - lineWidth, y1, outlineZ,
+    x1 + lineWidth, y2, outlineZ,
+    x1 - lineWidth, y2, outlineZ,
+    // Left edge (x1) - back
+    x1 - lineWidth, y1, outlineZ,
+    x1 + lineWidth, y2, outlineZ,
+    x1 + lineWidth, y1, outlineZ,
+    x1 - lineWidth, y1, outlineZ,
+    x1 - lineWidth, y2, outlineZ,
+    x1 + lineWidth, y2, outlineZ,
+    
+    // Right edge (x2) - front
+    x2 - lineWidth, y1, outlineZ,
+    x2 + lineWidth, y1, outlineZ,
+    x2 + lineWidth, y2, outlineZ,
+    x2 - lineWidth, y1, outlineZ,
+    x2 + lineWidth, y2, outlineZ,
+    x2 - lineWidth, y2, outlineZ,
+    // Right edge (x2) - back
+    x2 - lineWidth, y1, outlineZ,
+    x2 + lineWidth, y2, outlineZ,
+    x2 + lineWidth, y1, outlineZ,
+    x2 - lineWidth, y1, outlineZ,
+    x2 - lineWidth, y2, outlineZ,
+    x2 + lineWidth, y2, outlineZ,
+  ]);
+
+  // White color for all 48 outline vertices (4 edges × 6 vertices × 2 sides)
+  const outlineColor = new Uint8Array(48 * 4);
+  for (let i = 0; i < 48; i++) {
+    outlineColor[i * 4] = 255;     // R
+    outlineColor[i * 4 + 1] = 255; // G
+    outlineColor[i * 4 + 2] = 255; // B
+    outlineColor[i * 4 + 3] = 255; // A
+  }
+
+  const outlineResult = await Forma.render.addMesh({
+    geometryData: { position: outlinePosition, color: outlineColor },
+  });
+
+  outlineShadowId = outlineResult.id;
+  updateStatus(`Mesh with shadow added. Floating 175m above terrain.`);
+}
+
+async function removeMeshWithShadow(): Promise<void> {
+  if (meshShadowId) {
+    await Forma.render.remove({ id: meshShadowId });
+    meshShadowId = null;
+  }
+  if (outlineShadowId) {
+    await Forma.render.remove({ id: outlineShadowId });
+    outlineShadowId = null;
+  }
+  updateStatus("Mesh with shadow removed");
+}
+
 async function showExtrudedPolygon(): Promise<void> {
   if (extrudedId) {
     await Forma.render.remove({ id: extrudedId });
@@ -308,8 +474,13 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     </div>
     
     <div class="buttons">
-      <button id="show-mesh-btn">Show Mesh Polygon</button>
-      <button id="remove-mesh-btn">Remove Mesh</button>
+      <button id="show-mesh-btn">Mesh without shadow</button>
+      <button id="remove-mesh-btn">Remove</button>
+    </div>
+    
+    <div class="buttons">
+      <button id="show-mesh-shadow-btn">Mesh with shadow</button>
+      <button id="remove-mesh-shadow-btn">Remove</button>
     </div>
     
     <div class="buttons">
@@ -345,5 +516,7 @@ document.getElementById("show-btn")?.addEventListener("click", showFloatingSquar
 document.getElementById("remove-btn")?.addEventListener("click", removeSquare);
 document.getElementById("show-mesh-btn")?.addEventListener("click", showMeshPolygon);
 document.getElementById("remove-mesh-btn")?.addEventListener("click", removeMesh);
+document.getElementById("show-mesh-shadow-btn")?.addEventListener("click", showMeshPolygonWithShadow);
+document.getElementById("remove-mesh-shadow-btn")?.addEventListener("click", removeMeshWithShadow);
 document.getElementById("show-extruded-btn")?.addEventListener("click", showExtrudedPolygon);
 document.getElementById("remove-extruded-btn")?.addEventListener("click", removeExtruded);
