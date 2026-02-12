@@ -64,14 +64,12 @@ async function showFloatingSquare(): Promise<void> {
   });
   
   geojsonId = result.id;
-  updateStatus(`GeoJSON added with id: ${geojsonId}. Transform and elevation property don't elevate the polygon.`);
 }
 
 async function removeSquare(): Promise<void> {
   if (geojsonId) {
     await Forma.render.geojson.remove({ id: geojsonId });
     geojsonId = null;
-    updateStatus("GeoJSON removed");
   }
 }
 
@@ -95,7 +93,7 @@ async function showMeshPolygon(): Promise<void> {
     y: centerY,
   });
 
-  // 2. Define square size (100m × 100m), positioned 150m above terrain (above the GeoJSON)
+  // 2. Define square size (100m × 100m), positioned above terrain
   const halfSize = 50;
   const targetZ = (elevation ?? 0) + 150;
   
@@ -188,7 +186,6 @@ async function showMeshPolygon(): Promise<void> {
   });
 
   outlineId = outlineResult.id;
-  updateStatus(`Mesh square with outline added. Floating 150m above terrain.`);
 }
 
 async function removeMesh(): Promise<void> {
@@ -200,7 +197,6 @@ async function removeMesh(): Promise<void> {
     await Forma.render.remove({ id: outlineId });
     outlineId = null;
   }
-  updateStatus("Mesh removed");
 }
 
 async function showMeshPolygonWithShadow(): Promise<void> {
@@ -223,9 +219,9 @@ async function showMeshPolygonWithShadow(): Promise<void> {
     y: centerY,
   });
 
-  // 2. Define square size (100m × 100m), positioned 175m above terrain
+  // 2. Define square size (100m × 100m), positioned above terrain
   const halfSize = 50;
-  const targetZ = (elevation ?? 0) + 175;
+  const targetZ = (elevation ?? 0) + 75;
   
   console.log("Mesh with shadow target Z elevation:", targetZ);
 
@@ -352,7 +348,6 @@ async function showMeshPolygonWithShadow(): Promise<void> {
   });
 
   outlineShadowId = outlineResult.id;
-  updateStatus(`Mesh with shadow added. Floating 175m above terrain.`);
 }
 
 async function removeMeshWithShadow(): Promise<void> {
@@ -364,35 +359,16 @@ async function removeMeshWithShadow(): Promise<void> {
     await Forma.render.remove({ id: outlineShadowId });
     outlineShadowId = null;
   }
-  updateStatus("Mesh with shadow removed");
-}
-
-function updateStatus(message: string): void {
-  const statusEl = document.getElementById("status");
-  if (statusEl) {
-    statusEl.textContent = message;
-  }
 }
 
 // Setup UI
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div class="container">
     <h1>GeoJSON Elevation Test</h1>
-    <p class="description">
-      This extension reproduces a problem from the Forma Developer Forum:
-      <br><br>
-      <strong>Approach:</strong> Using 3D coordinates with Z value (terrain elevation + 100m) 
-      in each polygon vertex instead of transform or properties.elevation.
-    </p>
     
     <div class="buttons">
-      <button id="show-btn">Show GeoJSON Square</button>
+      <button id="show-btn">GeoJSON polygon</button>
       <button id="remove-btn">Remove GeoJSON</button>
-    </div>
-    
-    <div class="buttons">
-      <button id="show-mesh-btn">Mesh without shadow</button>
-      <button id="remove-mesh-btn">Remove</button>
     </div>
     
     <div class="buttons">
@@ -400,26 +376,9 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       <button id="remove-mesh-shadow-btn">Remove</button>
     </div>
     
-    <div id="status" class="status">Click "Show Floating Square" to test</div>
-    
-    <div class="code-block">
-      <h3>Code using 3D coordinates:</h3>
-      <pre>
-// Using Z coordinate in vertices
-const targetZ = terrainElevation + 100;
-
-coordinates: [[
-  [x1, y1, targetZ],
-  [x2, y2, targetZ],
-  [x3, y3, targetZ],
-  [x4, y4, targetZ],
-  [x1, y1, targetZ],
-]]
-
-await Forma.render.geojson.add({
-  geojson: square
-});
-      </pre>
+    <div class="buttons">
+      <button id="show-mesh-btn">Mesh without shadow</button>
+      <button id="remove-mesh-btn">Remove</button>
     </div>
   </div>
 `;
