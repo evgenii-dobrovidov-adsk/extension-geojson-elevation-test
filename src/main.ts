@@ -6,7 +6,6 @@ let meshId: string | null = null;
 let outlineId: string | null = null;
 let meshShadowId: string | null = null;
 let outlineShadowId: string | null = null;
-let extrudedId: string | null = null;
 
 async function showFloatingSquare(): Promise<void> {
   if (geojsonId) {
@@ -368,88 +367,6 @@ async function removeMeshWithShadow(): Promise<void> {
   updateStatus("Mesh with shadow removed");
 }
 
-async function showExtrudedPolygon(): Promise<void> {
-  if (extrudedId) {
-    await Forma.render.remove({ id: extrudedId });
-    extrudedId = null;
-  }
-
-  // 1. Terrain bounds
-  const bbox = await Forma.terrain.getBbox();
-  const centerX = (bbox.min.x + bbox.max.x) / 2;
-  const centerY = (bbox.min.y + bbox.max.y) / 2;
-  
-  const elevation = await Forma.terrain.getElevationAt({
-    x: centerX,
-    y: centerY,
-  });
-
-  // 2. Define square size (100m × 100m)
-  // Position: 200m above terrain (above the mesh at 150m)
-  const halfSize = 50;
-  const baseZ = (elevation ?? 0) + 200; // elevation property
-  const height = 1; // height property
-
-  const x1 = centerX - halfSize;
-  const x2 = centerX + halfSize;
-  const y1 = centerY - halfSize;
-  const y2 = centerY + halfSize;
-  const z1 = baseZ;
-  const z2 = baseZ + height;
-
-  // 3. Create extruded polygon mesh (box with 6 faces)
-  // Each face needs 2 triangles = 6 vertices
-  const position = new Float32Array([
-    // Bottom face (z1)
-    x1, y1, z1,  x2, y1, z1,  x2, y2, z1,
-    x1, y1, z1,  x2, y2, z1,  x1, y2, z1,
-    
-    // Top face (z2)
-    x1, y1, z2,  x2, y2, z2,  x2, y1, z2,
-    x1, y1, z2,  x1, y2, z2,  x2, y2, z2,
-    
-    // Front face (y1)
-    x1, y1, z1,  x2, y1, z2,  x2, y1, z1,
-    x1, y1, z1,  x1, y1, z2,  x2, y1, z2,
-    
-    // Back face (y2)
-    x1, y2, z1,  x2, y2, z1,  x2, y2, z2,
-    x1, y2, z1,  x2, y2, z2,  x1, y2, z2,
-    
-    // Left face (x1)
-    x1, y1, z1,  x1, y2, z2,  x1, y1, z2,
-    x1, y1, z1,  x1, y2, z1,  x1, y2, z2,
-    
-    // Right face (x2)
-    x2, y1, z1,  x2, y1, z2,  x2, y2, z2,
-    x2, y1, z1,  x2, y2, z2,  x2, y2, z1,
-  ]);
-
-  // Red color for all 36 vertices (6 faces × 6 vertices)
-  const color = new Uint8Array(36 * 4);
-  for (let i = 0; i < 36; i++) {
-    color[i * 4] = 255;     // R
-    color[i * 4 + 1] = 0;   // G
-    color[i * 4 + 2] = 0;   // B
-    color[i * 4 + 3] = 153; // A (~60% opacity)
-  }
-
-  const result = await Forma.render.addMesh({
-    geometryData: { position, color },
-  });
-
-  extrudedId = result.id;
-  updateStatus(`ExtrudedPolygon added: elevation=${baseZ.toFixed(1)}m, height=${height}m`);
-}
-
-async function removeExtruded(): Promise<void> {
-  if (extrudedId) {
-    await Forma.render.remove({ id: extrudedId });
-    extrudedId = null;
-  }
-  updateStatus("ExtrudedPolygon removed");
-}
-
 function updateStatus(message: string): void {
   const statusEl = document.getElementById("status");
   if (statusEl) {
@@ -483,11 +400,6 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       <button id="remove-mesh-shadow-btn">Remove</button>
     </div>
     
-    <div class="buttons">
-      <button id="show-extruded-btn">Show ExtrudedPolygon</button>
-      <button id="remove-extruded-btn">Remove Extruded</button>
-    </div>
-    
     <div id="status" class="status">Click "Show Floating Square" to test</div>
     
     <div class="code-block">
@@ -518,5 +430,3 @@ document.getElementById("show-mesh-btn")?.addEventListener("click", showMeshPoly
 document.getElementById("remove-mesh-btn")?.addEventListener("click", removeMesh);
 document.getElementById("show-mesh-shadow-btn")?.addEventListener("click", showMeshPolygonWithShadow);
 document.getElementById("remove-mesh-shadow-btn")?.addEventListener("click", removeMeshWithShadow);
-document.getElementById("show-extruded-btn")?.addEventListener("click", showExtrudedPolygon);
-document.getElementById("remove-extruded-btn")?.addEventListener("click", removeExtruded);
