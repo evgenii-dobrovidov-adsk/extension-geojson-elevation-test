@@ -1,6 +1,6 @@
 # GeoJSON Elevation Test
 
-An Autodesk Forma extension for testing different approaches to render polygons above terrain.
+An Autodesk Forma Site Design extension for testing different approaches to render polygons above terrain.
 
 ![Screenshot](screenshot.png)
 
